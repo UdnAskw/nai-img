@@ -1,5 +1,7 @@
-__pycache__
-.venv
+__pycache__/
+.venv/
+artifact/
+.DS_Store
 *.png
 *.jpg
 *.jpeg
