@@ -7,6 +7,7 @@ import configparser
 import datetime
 import time
 
+from dotenv import load_dotenv
 from asyncio import run
 
 from boilerplate import API
@@ -16,6 +17,7 @@ from novelai_api.ImagePreset import ImageModel, ImagePreset, ImageResolution, UC
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_DIR = os.path.join(SCRIPT_DIR, '../config')
 SAVE_DIR = os.path.join(SCRIPT_DIR, '../artifact')
+ENV_DIR = os.path.join(SCRIPT_DIR, '../')
 
 MODEL_MAPPING = {
     'anime_curated': ImageModel.Anime_Curated,
@@ -133,6 +135,7 @@ def raw_preset_type_conv(raw_preset):
 
 
 async def main():
+    load_dotenv(os.path.join(ENV_DIR, '.env'))
     settings = get_settings(get_args())
     os.makedirs(settings['save_dir'], exist_ok=True)
 

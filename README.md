@@ -2,10 +2,18 @@
 - NovelAIで画像を無限に生成する
 
 # つかいかた
-- novelai_api をインストール
+- 必要なモジュールをインストール
     ```
-    pip install novelai_api
+    pip install novelai_api python-dotenv
     ```
+
+- NovelAIの認証情報を設定ファイルに記入
+    1. `nai-img/`配下に`.env`の名前でファイルを作成
+    2. ファイルに以下のように認証情報を記入
+        ```
+        NAI_USERNAME=user@example.com
+        NAI_PASSWORD=yourpassword
+        ```
 
 - 設定ファイルを編集
     - `nai-img/config/preset_default`

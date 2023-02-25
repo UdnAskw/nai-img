@@ -2,6 +2,7 @@ __pycache__/
 .venv/
 artifact/
 .DS_Store
+.env
 *.png
 *.jpg
 *.jpeg
