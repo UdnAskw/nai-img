@@ -16,8 +16,8 @@ from novelai_api.ImagePreset import ImageModel, ImagePreset, ImageResolution, UC
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_DIR = os.path.join(SCRIPT_DIR, '../config')
-SAVE_DIR = os.path.join(SCRIPT_DIR, '../artifact')
 ENV_DIR = os.path.join(SCRIPT_DIR, '../')
+DEFAULT_SAVE_DIR = os.path.join(SCRIPT_DIR, '../artifact')
 
 MODEL_MAPPING = {
     'anime_curated': ImageModel.Anime_Curated,
@@ -60,9 +60,10 @@ def get_args():
     parser.add_argument('-u', '--uc', type=str, help='Negative prompt')
     parser.add_argument('-S', '--scale', type=float, help='Scale')
     parser.add_argument('-s', '--steps', type=int, help='Steps')
-    parser.add_argument('-i', '--interval', type=float, default=5, help='Generate images interval (sec)')
-    parser.add_argument('-r', '--repeat', type=float, default=1, help='Repeat count')
-    parser.add_argument('-d', '--save-dir', type=str, default=SAVE_DIR, help='Save directory')
+    parser.add_argument('-i', '--interval', type=float, help='Generate images interval (sec)')
+    parser.add_argument('-r', '--repeat', type=float, help='Repeat count')
+    parser.add_argument('-d', '--save-dir', type=str, default=DEFAULT_SAVE_DIR, help='Save directory')
+    parser.add_argument('-g', '--general-file', type=str, default='general.ini', help='General config file name')
     #parser.add_argument('--strength')
     #parser.add_argument('--noise')
     #parser.add_argument('--sampling')
@@ -70,23 +71,57 @@ def get_args():
 
 
 def get_settings(args):
-    interval = args.interval
-    repeat = args.repeat
-    save_dir = args.save_dir
-    prompt = get_prompt_from_file(args.prompt_file) + args.prompt
-    model = MODEL_MAPPING[args.model]
-    preset = get_preset_from_file(args.preset_file)
-    preset['uc'] = preset['uc'] + args.uc if args.uc is not None else preset['uc']
+    general_settings, args = get_general_settings(args)
+    nai_settings, args = get_nai_settings(args)
+    nai_settings['preset'] = overwrite_preset(nai_settings['preset'], args)
+    return general_settings | nai_settings
+
+
+def get_general_settings(args):
+    general_settings = load_ini_from_file(args.general_file)
+
+    if general_settings['save_dir']:
+        save_dir = general_settings['save_dir']
+    elif args.save_dir:
+        save_dir = args.save_dir
+    else:
+        save_dir = DEFAULT_SAVE_DIR
+
+    general_settings = {
+        'interval': args.interval if args.interval else int(general_settings['interval']),
+        'repeat': args.repeat if args.repeat else int(general_settings['repeat']),
+        'save_dir': save_dir,
+    }
     del (
+        args.general_file,
         args.repeat,
         args.interval,
+        args.save_dir,
+    )
+    return general_settings, args
+
+
+def get_nai_settings(args):
+    prompt = load_prompt_from_file(args.prompt_file) + args.prompt
+    model = MODEL_MAPPING[args.model]
+    raw_preset = load_ini_from_file(args.preset_file)
+    preset = raw_preset_type_conv(raw_preset)
+    preset['uc'] = preset['uc'] + args.uc if args.uc is not None else preset['uc']
+    del (
         args.prompt_file,
         args.model,
         args.preset_file,
         args.uc,
-        args.save_dir,
     )
+    nai_settings = {
+        'prompt': prompt,
+        'model': model,
+        'preset': preset,
+    }
+    return nai_settings, args
 
+
+def overwrite_preset(preset, args):
     d_args = args.__dict__
     for key in d_args.keys():
         if d_args[key]:
@@ -97,18 +132,11 @@ def get_settings(args):
         raise SyntaxError('resolution option expected "XXX,YYY"')
     else:
         preset['resolution'] = tuple_res
-
-    return {
-        'prompt': prompt,
-        'model': model,
-        'preset': preset,
-        'interval': interval,
-        'repeat': repeat,
-        'save_dir': save_dir,
-    }
+    
+    return preset
 
 
-def get_prompt_from_file(filename):
+def load_prompt_from_file(filename):
     prompt = ''
     with open(os.path.join(CONFIG_DIR, filename), 'r') as f:
         for line in f:
@@ -116,11 +144,10 @@ def get_prompt_from_file(filename):
     return prompt
 
 
-def get_preset_from_file(filename):
+def load_ini_from_file(filename):
     config = configparser.ConfigParser()
     config.read(os.path.join(CONFIG_DIR, filename))
-    raw_preset = dict(config['default'])
-    return raw_preset_type_conv(raw_preset)
+    return  dict(config['default'])
 
 
 def raw_preset_type_conv(raw_preset):
@@ -137,19 +164,19 @@ def raw_preset_type_conv(raw_preset):
 async def main():
     load_dotenv(os.path.join(ENV_DIR, '.env'))
     settings = get_settings(get_args())
+    pprint.pprint(settings)
     os.makedirs(settings['save_dir'], exist_ok=True)
 
     async with API() as api_handler:
         api = api_handler.api
 
         preset = ImagePreset(**settings['preset'])
-        pprint.pprint(settings)
 
         count = 0
         while count < settings['repeat']:
             async for img in api.high_level.generate_image(settings['prompt'], settings['model'], preset):
                 now = datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')
-                with open(os.path.join(SAVE_DIR, f"{now}.png"), "wb") as f:
+                with open(os.path.join(settings['save_dir'], f"{now}.png"), "wb") as f:
                     f.write(img)
                 count += 1
                 if count < settings['repeat']:
