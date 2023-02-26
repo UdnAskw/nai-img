@@ -62,7 +62,7 @@ def get_args():
     parser.add_argument('-s', '--steps', type=int, help='Steps')
     parser.add_argument('-i', '--interval', type=float, help='Generate images interval (sec)')
     parser.add_argument('-r', '--repeat', type=float, help='Repeat count')
-    parser.add_argument('-d', '--save-dir', type=str, default=DEFAULT_SAVE_DIR, help='Save directory')
+    parser.add_argument('-d', '--save-dir', type=str, help='Save directory')
     parser.add_argument('-g', '--general-file', type=str, default='general.ini', help='General config file name')
     #parser.add_argument('--strength')
     #parser.add_argument('--noise')
@@ -80,10 +80,10 @@ def get_settings(args):
 def get_general_settings(args):
     general_settings = load_ini_from_file(args.general_file)
 
-    if general_settings['save_dir']:
-        save_dir = general_settings['save_dir']
-    elif args.save_dir:
+    if args.save_dir:
         save_dir = args.save_dir
+    elif general_settings['save_dir']:
+        save_dir = general_settings['save_dir']
     else:
         save_dir = DEFAULT_SAVE_DIR
 
