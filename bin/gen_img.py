@@ -48,7 +48,7 @@ TYPE_MAPPING = {
 def get_args():
     parser = argparse.ArgumentParser(description='Description')
     parser.add_argument('-p', '--prompt', type=str, default='', help='Prompt')
-    parser.add_argument('-f', '--prompt-file', type=str, default='prompt_default.txt', help='Prompt file name')
+    parser.add_argument('-P', '--prompt-file', type=str, default='prompt_default.txt', help='Prompt file name')
     parser.add_argument('-m', '--model', type=str, choices=MODEL_MAPPING.keys(), default='anime_full', help='ImageModel')
     parser.add_argument('-F', '--preset-file', type=str, default='preset_default.ini', help='Preset file name')
     parser.add_argument('-e', '--seed', type=int, help='Seed')
@@ -56,14 +56,15 @@ def get_args():
     parser.add_argument('-q', '--quality-toggle', type=bool, help='Add quality tags')
     #parser.add_argument('-r', '--resolution', type=str, choices=RESOLUTION_MAPPING.keys(), help='Image resolution')
     parser.add_argument('-R', '--resolution', type=str, help='Resolution (ex. 512,768)')
-    #parser.add_argument('-U', '--uc-preset', help='Negative prompt preset')
     parser.add_argument('-u', '--uc', type=str, help='Negative prompt')
+    parser.add_argument('-U', '--uc-file', default='uc_default.txt', help='Negative prompt file')
     parser.add_argument('-S', '--scale', type=float, help='Scale')
     parser.add_argument('-s', '--steps', type=int, help='Steps')
     parser.add_argument('-i', '--interval', type=float, help='Generate images interval (sec)')
     parser.add_argument('-r', '--repeat', type=float, help='Repeat count')
     parser.add_argument('-d', '--save-dir', type=str, help='Save directory')
     parser.add_argument('-g', '--general-file', type=str, default='general.ini', help='General config file name')
+    parser.add_argument('-D', '--dryrun', action='store_true', help='Dryrun')
     #parser.add_argument('--strength')
     #parser.add_argument('--noise')
     #parser.add_argument('--sampling')
@@ -88,11 +89,13 @@ def get_general_settings(args):
         save_dir = DEFAULT_SAVE_DIR
 
     general_settings = {
-        'interval': args.interval if args.interval else int(general_settings['interval']),
+        'dryrun': args.dryrun,
+        'interval': args.interval if args.interval else float(general_settings['interval']),
         'repeat': args.repeat if args.repeat else int(general_settings['repeat']),
         'save_dir': save_dir,
     }
     del (
+        args.dryrun,
         args.general_file,
         args.repeat,
         args.interval,
@@ -103,15 +106,19 @@ def get_general_settings(args):
 
 def get_nai_settings(args):
     prompt = load_prompt_from_file(args.prompt_file) + args.prompt
+    uc = load_prompt_from_file(args.uc_file)
+    if args.uc:
+        uc = load_prompt_from_file(args.uc_file) + args.uc
     model = MODEL_MAPPING[args.model]
     raw_preset = load_ini_from_file(args.preset_file)
     preset = raw_preset_type_conv(raw_preset)
-    preset['uc'] = preset['uc'] + args.uc if args.uc is not None else preset['uc']
+    preset['uc'] = uc
     del (
         args.prompt_file,
         args.model,
         args.preset_file,
         args.uc,
+        args.uc_file,
     )
     nai_settings = {
         'prompt': prompt,
@@ -165,6 +172,8 @@ async def main():
     load_dotenv(os.path.join(ENV_DIR, '.env'))
     settings = get_settings(get_args())
     pprint.pprint(settings)
+    if settings['dryrun']:
+        sys.exit(0)
     os.makedirs(settings['save_dir'], exist_ok=True)
 
     async with API() as api_handler:
